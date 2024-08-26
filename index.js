@@ -1,30 +1,13 @@
-import express from "express";
-import cors from "cors";
-import bodyParser from "body-parser";
-import knex from "./database_client.js";
-import mealsRouter from "./routers/meals.js";
-import reservationsRouter from "./routers/reservations.js";
+import express from 'express';
+import mealsRouter from './meals';
 
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
+const port = process.env.PORT || 3000;
 
-const apiRouter = express.Router();
+app.use(express.json());
 
-apiRouter.get("/", async (req, res) => {
-  const SHOW_TABLES_QUERY =
-    process.env.DB_CLIENT === "pg"
-      ? "SELECT * FROM pg_catalog.pg_tables;"
-      : "SHOW TABLES;";
-  const tables = await knex.raw(SHOW_TABLES_QUERY);
-  res.json({ tables });
-});
+app.use('/api', mealsRouter);
 
-apiRouter.use("/meals", mealsRouter);
-apiRouter.use("/reservations", reservationsRouter);
-
-app.use("/api", apiRouter);
-
-app.listen(process.env.PORT, () => {
-  console.log(`API listening on port ${process.env.PORT}`);
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
