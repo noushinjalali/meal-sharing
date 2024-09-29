@@ -1,61 +1,52 @@
-import express from "express";
-import knex from "../database_client.js";
+import express from 'express';
+import knex from '../database_client';
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get('/meals', async (req, res) => {
   try {
-    const meals = await knex("meals").select("*");
+    let query = knex('meals');
+
+    if (req.query.maxPrice) {
+      query = query.where('price', '<=', req.query.maxPrice);
+    }
+
+    if (req.query.availableReservations === 'true') {
+      query = query.join('reservations', 'meals.id', '=', 'reservations.meal_id')
+                   .groupBy('meals.id')
+                   .having(knex.raw('max_reservations - COUNT(reservations.id)'), '>', 0);
+    } else if (req.query.availableReservations === 'false') {
+      query = query.join('reservations', 'meals.id', '=', 'reservations.meal_id')
+                   .groupBy('meals.id')
+                   .having(knex.raw('max_reservations - COUNT(reservations.id)'), '<=', 0);
+    }
+
+    if (req.query.title) {
+      query = query.where('title', 'like', `%${req.query.title}%`);
+    }
+
+    if (req.query.dateAfter) {
+      query = query.where('when', '>', req.query.dateAfter);
+    }
+
+    if (req.query.dateBefore) {
+      query = query.where('when', '<', req.query.dateBefore);
+    }
+
+    if (req.query.sortKey) {
+      const sortDir = req.query.sortDir || 'asc';
+      query = query.orderBy(req.query.sortKey, sortDir);
+    }
+
+    if (req.query.limit) {
+      query = query.limit(parseInt(req.query.limit));
+    }
+
+    const meals = await query.select('*');
     res.json(meals);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
-router.get("/:id", async (req, res) => {
-  try {
-    const meal = await knex("meals").where({ id: req.params.id }).first();
-    if (!meal) {
-      return res.status(404).json({ message: "Meal not found" });
-    }
-    res.json(meal);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.post("/", async (req, res) => {
-  try {
-    const [id] = await knex("meals").insert(req.body);
-    res.status(201).json({ message: "Meal created", id });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.put("/:id", async (req, res) => {
-  try {
-    const count = await knex("meals")
-      .where({ id: req.params.id })
-      .update(req.body);
-    if (!count) {
-      return res.status(404).json({ message: "Meal not found" });
-    }
-    res.json({ message: "Meal updated" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.delete("/:id", async (req, res) => {
-  try {
-    const count = await knex("meals").where({ id: req.params.id }).del();
-    if (!count) {
-      return res.status(404).json({ message: "Meal not found" });
-    }
-    res.json({ message: "Meal deleted" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve meals' });
   }
 });
 
